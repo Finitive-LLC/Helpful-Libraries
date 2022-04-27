@@ -1,7 +1,8 @@
+using System;
 using System.Runtime.InteropServices;
 using System.Security;
 
-namespace System;
+namespace Lombiq.HelpfulLibraries.Common.Extensions;
 
 public static class ExceptionExtensions
 {

@@ -5,6 +5,6 @@ namespace Lombiq.HelpfulLibraries.OrchardCore.Users;
 
 public static class ServiceCollectionExtensions
 {
-    public static void AddCachingUserServer(this IServiceCollection services) =>
-        services.TryAddScoped<ICachingUserManager, CachingUserManager>();
+    public static IServiceCollection AddCachingUserServer(this IServiceCollection services) =>
+        services.AddScoped<ICachingUserManager, CachingUserManager>();
 }
