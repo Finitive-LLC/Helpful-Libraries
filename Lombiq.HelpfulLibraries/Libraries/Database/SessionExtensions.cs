@@ -37,12 +37,15 @@ namespace YesSql
             Func<(string ParsedQuery, IDbTransaction Transaction), Task<IEnumerable<TRow>>> queryExecutor = null,
             DbTransaction transaction = null)
         {
-            transaction ??= await session.DemandAsync();
-            var query = GetQuery(sql, transaction, session);
-
+            var query = GetQuery(sql, session);
+            if (transaction != null)
+                return queryExecutor == null
+                    ? await transaction.Connection.QueryAsync<TRow>(query, parameters, transaction)
+                    : await queryExecutor((query, transaction));
+            await using var nTransaction = await session.BeginTransactionAsync();
             return queryExecutor == null
-                ? await transaction.Connection.QueryAsync<TRow>(query, parameters, transaction)
-                : await queryExecutor((query, transaction));
+                ? await nTransaction.Connection.QueryAsync<TRow>(query, parameters, nTransaction)
+                : await queryExecutor((query, nTransaction));
         }
 
         /// <summary>
@@ -60,12 +63,16 @@ namespace YesSql
             object parameters = null,
             DbTransaction transaction = null)
         {
-            transaction ??= await session.DemandAsync();
-            var dialect = TransactionSqlDialectFactory.For(transaction);
             var prefix = session.Store.Configuration.TablePrefix;
-            var query = getSqlQuery(transaction, dialect, prefix);
+            var query = getSqlQuery(transaction, prefix);
 
-            return await transaction.Connection.ExecuteAsync(query, parameters, transaction);
+            if (transaction != null)
+            {
+                return await session.CurrentTransaction.Connection.ExecuteAsync(query, parameters, transaction);
+            }
+            // TODO: review the need for transaction
+            await using var nTransaction = await session.BeginTransactionAsync();
+            return await session.CurrentTransaction.Connection.ExecuteAsync(query, parameters, nTransaction);
         }
 
         private static string GetQuery(
@@ -101,11 +108,15 @@ namespace YesSql
         /// <returns><see langword="true" /> if the query updated an existing <see cref="Document"/> successfully.</returns>
         public static async Task<bool> UpdateDocumentDirectlyAsync(this ISession session, int documentId, object entity)
         {
-            var transaction = await session.DemandAsync();
-            var dialect = session.Store.Dialect;
+            // TODO: review the need for transaction
+            await using var transaction = await session.BeginTransactionAsync();
+            var dialect = session.Store.Configuration.SqlDialect;
             var content = session.Store.Configuration.ContentSerializer.Serialize(entity);
 
-            var sql = @$"UPDATE {dialect.QuoteForTableName(session.Store.Configuration.TablePrefix + Store.DocumentTable)}
+            var tableName = session.Store.Configuration.TablePrefix +
+                session.Store.Configuration.TableNameConvention.GetDocumentTable();
+
+            var sql = @$"UPDATE {dialect.QuoteForTableName(tableName)}
                 SET {dialect.QuoteForColumnName("Content")} = @Content
                 WHERE {dialect.QuoteForColumnName("Id")} = @Id";
 

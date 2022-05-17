@@ -68,6 +68,7 @@ namespace Lombiq.HelpfulLibraries.Tests.UnitTests.Services
             await using (var connection = dbAccessor.CreateConnection())
             {
                 await connection.OpenAsync();
+                // TODO: review the need for transaction
                 await using (var transaction = await connection.BeginTransactionAsync())
                 {
                     var schemaBuilder = new SchemaBuilder(_configuration, transaction);
