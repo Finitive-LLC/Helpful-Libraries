@@ -55,7 +55,10 @@ namespace Lombiq.HelpfulLibraries.LinqToDb
             this ISession session,
             Func<ITableAccessor, Task<TResult>> query)
         {
-            var transaction = await session.DemandAsync();
+            
+            // TODO: review the need for transaction
+            // TODO: review removing transaction for the below
+            await using var transaction = await session.BeginTransactionAsync();
 
             // Instantiating a LinqToDB connection object as it is required to start building the query. Note that it
             // won't create an actual connection with the database.
